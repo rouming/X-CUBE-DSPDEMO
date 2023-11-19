@@ -120,124 +120,133 @@ void ili9341_Init(void)
 {
   /* Initialize ILI9341 low level bus layer ----------------------------------*/
   LCD_IO_Init();
-  
-  /* Configure LCD */
-  ili9341_WriteReg(0xCA);
-  ili9341_WriteData(0xC3);
-  ili9341_WriteData(0x08);
-  ili9341_WriteData(0x50);
-  ili9341_WriteReg(LCD_POWERB);
+
+  ili9341_WriteReg(LCD_SWRESET);
+  HAL_Delay(50);
+
+  ili9341_WriteReg(LCD_DISPLAY_OFF);
+
+  ili9341_WriteReg(0xCF);
   ili9341_WriteData(0x00);
-  ili9341_WriteData(0xC1);
+  ili9341_WriteData(0x83);
   ili9341_WriteData(0x30);
-  ili9341_WriteReg(LCD_POWER_SEQ);
+
+  ili9341_WriteReg(0xED);
   ili9341_WriteData(0x64);
   ili9341_WriteData(0x03);
   ili9341_WriteData(0x12);
   ili9341_WriteData(0x81);
-  ili9341_WriteReg(LCD_DTCA);
+
+  ili9341_WriteReg(0xE8);
   ili9341_WriteData(0x85);
-  ili9341_WriteData(0x00);
-  ili9341_WriteData(0x78);
-  ili9341_WriteReg(LCD_POWERA);
+  ili9341_WriteData(0x01);
+  ili9341_WriteData(0x79);
+
+  ili9341_WriteReg(0xCB);
   ili9341_WriteData(0x39);
   ili9341_WriteData(0x2C);
   ili9341_WriteData(0x00);
   ili9341_WriteData(0x34);
   ili9341_WriteData(0x02);
-  ili9341_WriteReg(LCD_PRC);
+
+  ili9341_WriteReg(0xF7);
   ili9341_WriteData(0x20);
-  ili9341_WriteReg(LCD_DTCB);
+
+  ili9341_WriteReg(0xEA);
   ili9341_WriteData(0x00);
   ili9341_WriteData(0x00);
+
+  ili9341_WriteReg(LCD_POWER1);
+  ili9341_WriteData(0x26);
+
+  ili9341_WriteReg(LCD_POWER2);
+  ili9341_WriteData(0x11);
+
+  ili9341_WriteReg(LCD_VCOM1);
+  ili9341_WriteData(0x35);
+  ili9341_WriteData(0x3E);
+
+  ili9341_WriteReg(LCD_VCOM2);
+  ili9341_WriteData(0xBE);
+
+  ili9341_WriteReg(LCD_MAC);
+  ili9341_WriteData(ILI9341_LANDSCAPE_CFG);
+
+  ili9341_WriteReg(LCD_PIXEL_FORMAT);
+  ili9341_WriteData(0x55);
+
   ili9341_WriteReg(LCD_FRMCTR1);
   ili9341_WriteData(0x00);
   ili9341_WriteData(0x1B);
-  ili9341_WriteReg(LCD_DFC);
+
+  ili9341_WriteReg(0xF2);
+  ili9341_WriteData(0x08);
+
+  ili9341_WriteReg(LCD_GAMMA);
+  ili9341_WriteData(0x01);
+
+  ili9341_WriteReg(LCD_PGAMMA);
+  ili9341_WriteData(0x1F);
+  ili9341_WriteData(0x1A);
+  ili9341_WriteData(0x18);
   ili9341_WriteData(0x0A);
-  ili9341_WriteData(0xA2);
-  ili9341_WriteReg(LCD_POWER1);
-  ili9341_WriteData(0x10);
-  ili9341_WriteReg(LCD_POWER2);
-  ili9341_WriteData(0x10);
-  ili9341_WriteReg(LCD_VCOM1);
+  ili9341_WriteData(0x0F);
+  ili9341_WriteData(0x06);
   ili9341_WriteData(0x45);
-  ili9341_WriteData(0x15);
-  ili9341_WriteReg(LCD_VCOM2);
-  ili9341_WriteData(0x90);
-  ili9341_WriteReg(LCD_MAC);
-  ili9341_WriteData(0xC8);
-  ili9341_WriteReg(LCD_3GAMMA_EN);
-  ili9341_WriteData(0x00);
-  ili9341_WriteReg(LCD_RGB_INTERFACE);
-  ili9341_WriteData(0xC2);
-  ili9341_WriteReg(LCD_DFC);
+  ili9341_WriteData(0x87);
+  ili9341_WriteData(0x32);
   ili9341_WriteData(0x0A);
-  ili9341_WriteData(0xA7);
+  ili9341_WriteData(0x07);
+  ili9341_WriteData(0x02);
+  ili9341_WriteData(0x07);
+  ili9341_WriteData(0x05);
+  ili9341_WriteData(0x00);
+
+  ili9341_WriteReg(LCD_NGAMMA);
+  ili9341_WriteData(0x00);
+  ili9341_WriteData(0x25);
   ili9341_WriteData(0x27);
-  ili9341_WriteData(0x04);
-  
-  /* Colomn address set */
+  ili9341_WriteData(0x05);
+  ili9341_WriteData(0x10);
+  ili9341_WriteData(0x09);
+  ili9341_WriteData(0x3A);
+  ili9341_WriteData(0x78);
+  ili9341_WriteData(0x4D);
+  ili9341_WriteData(0x05);
+  ili9341_WriteData(0x18);
+  ili9341_WriteData(0x0D);
+  ili9341_WriteData(0x38);
+  ili9341_WriteData(0x3A);
+  ili9341_WriteData(0x1F);
+
   ili9341_WriteReg(LCD_COLUMN_ADDR);
   ili9341_WriteData(0x00);
   ili9341_WriteData(0x00);
   ili9341_WriteData(0x00);
   ili9341_WriteData(0xEF);
-  /* Page address set */
+
   ili9341_WriteReg(LCD_PAGE_ADDR);
   ili9341_WriteData(0x00);
   ili9341_WriteData(0x00);
   ili9341_WriteData(0x01);
   ili9341_WriteData(0x3F);
-  ili9341_WriteReg(LCD_INTERFACE);
-  ili9341_WriteData(0x01);
-  ili9341_WriteData(0x00);
-  ili9341_WriteData(0x06);
-  
-  ili9341_WriteReg(LCD_GRAM);
-  LCD_Delay(200);
-  
-  ili9341_WriteReg(LCD_GAMMA);
-  ili9341_WriteData(0x01);
-  
-  ili9341_WriteReg(LCD_PGAMMA);
-  ili9341_WriteData(0x0F);
-  ili9341_WriteData(0x29);
-  ili9341_WriteData(0x24);
-  ili9341_WriteData(0x0C);
-  ili9341_WriteData(0x0E);
-  ili9341_WriteData(0x09);
-  ili9341_WriteData(0x4E);
-  ili9341_WriteData(0x78);
-  ili9341_WriteData(0x3C);
-  ili9341_WriteData(0x09);
-  ili9341_WriteData(0x13);
-  ili9341_WriteData(0x05);
-  ili9341_WriteData(0x17);
-  ili9341_WriteData(0x11);
-  ili9341_WriteData(0x00);
-  ili9341_WriteReg(LCD_NGAMMA);
-  ili9341_WriteData(0x00);
-  ili9341_WriteData(0x16);
-  ili9341_WriteData(0x1B);
-  ili9341_WriteData(0x04);
-  ili9341_WriteData(0x11);
+
+  ili9341_WriteReg(LCD_ETMOD);
   ili9341_WriteData(0x07);
-  ili9341_WriteData(0x31);
-  ili9341_WriteData(0x33);
-  ili9341_WriteData(0x42);
-  ili9341_WriteData(0x05);
-  ili9341_WriteData(0x0C);
+
+  ili9341_WriteReg(LCD_DFC);
   ili9341_WriteData(0x0A);
-  ili9341_WriteData(0x28);
-  ili9341_WriteData(0x2F);
-  ili9341_WriteData(0x0F);
-  
+  ili9341_WriteData(0x82);
+  ili9341_WriteData(0x27);
+  ili9341_WriteData(0x00);
+
   ili9341_WriteReg(LCD_SLEEP_OUT);
-  LCD_Delay(200);
+  HAL_Delay(100);
   ili9341_WriteReg(LCD_DISPLAY_ON);
-  /* GRAM start writing */
+  HAL_Delay(100);
   ili9341_WriteReg(LCD_GRAM);
+
+  LCD_Backlight_On();
 }
 
 /**

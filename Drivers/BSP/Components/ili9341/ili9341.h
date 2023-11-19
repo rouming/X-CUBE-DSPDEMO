@@ -45,7 +45,7 @@
 #endif 
 
 /* Includes ------------------------------------------------------------------*/
-#include "../Common/lcd.h"
+#include "lcd.h"
 
 /** @addtogroup BSP
   * @{
@@ -81,6 +81,7 @@
 #define  ILI9341_LCD_PIXEL_WIDTH    ((uint16_t)240)
 #define  ILI9341_LCD_PIXEL_HEIGHT   ((uint16_t)320)
 
+
 /** 
   * @brief  ILI9341 Timing  
   */     
@@ -101,6 +102,28 @@
 #define  ILI9341_VSYNC            ((uint32_t)1)   /* Vertical synchronization   */
 #define  ILI9341_VBP              ((uint32_t)3)    /* Vertical back porch        */
 #define  ILI9341_VFP              ((uint32_t)2)    /* Vertical front porch       */
+
+#define ILI9341_MADCTL_MY			0x80
+#define ILI9341_MADCTL_MX			0x40
+#define ILI9341_MADCTL_MV			0x20
+#define ILI9341_MADCTL_ML			0x10
+#define ILI9341_MADCTL_RGB			0x00
+#define ILI9341_MADCTL_BGR			0x08
+#define ILI9341_MADCTL_MH			0x04
+
+#define ILI9341_ROW_ADDR_ORDER   ILI9341_MADCTL_MY
+#define ILI9341_COL_ADDR_ORDER   ILI9341_MADCTL_MX
+#define ILI9341_ROW_COL_EXCH     ILI9341_MADCTL_MV
+#define ILI9341_HREFRESH_ORDER   ILI9341_MADCTL_MH
+#define ILI9341_VREFRESH_ORDER   ILI9341_MADCTL_ML
+#define ILI9341_COLOR_ORDER      ILI9341_MADCTL_BGR
+
+
+#define ILI9341_PORTRAIT_CFG         (ILI9341_COL_ADDR_ORDER | ILI9341_COLOR_ORDER)
+#define ILI9341_LANDSCAPE_CFG        (ILI9341_ROW_COL_EXCH   | ILI9341_COLOR_ORDER)
+#define ILI9341_PORTRAIT_MIRROR_CFG  (ILI9341_ROW_ADDR_ORDER | ILI9341_COLOR_ORDER)
+#define ILI9341_LANDSCAPE_MIRROR_CFG (ILI9341_ROW_ADDR_ORDER | ILI9341_COL_ADDR_ORDER | \
+									  ILI9341_ROW_COL_EXCH   | ILI9341_COLOR_ORDER)
 
 /** 
   * @brief  ILI9341 Registers  

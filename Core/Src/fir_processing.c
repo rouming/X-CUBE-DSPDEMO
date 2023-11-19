@@ -140,23 +140,24 @@ void FIR_PROCESSING_F32Process(void)
   static int counter_FIR_Ds;
   static int counter_FIR_Dd;
   int DataID = 1;
-  uint32_t duration_us = 0x00;
+  uint32_t nb_cycles;
+  uint32_t duration_us;
   /* Call FIR init function to initialize the instance structure. */
   arm_fir_init_f32(&FIR_F32_Struct, NUM_TAPS, (float32_t *)&aFIR_F32_Coeffs[0], &firStateF32[0], blockSize);
 
   /* Call the FIR process function for every blockSize samples */
-  TimerCount_Start();
+  nb_cycles = cycles_counter();
 
   for (counter_FIR_f32_p = 0; counter_FIR_f32_p < numBlocks; counter_FIR_f32_p++)
   {
     arm_fir_f32(&FIR_F32_Struct, aFIR_F32_1kHz_15kHz + (counter_FIR_f32_p * blockSize), aFIR_F32_Output + (counter_FIR_f32_p * blockSize), blockSize);
   }
 
-  TimerCount_Stop(nb_cycles);
+  nb_cycles = cycles_counter() - nb_cycles;
 
   GUI_Clear();
   LCD_OUTPUT_Cycles(5, 305, nb_cycles);
-  duration_us = (uint32_t)(((uint64_t)US_IN_SECOND * (nb_cycles)) / SystemCoreClock);
+  duration_us = (uint32_t)cycles_counter_to_us(nb_cycles);
   LCD_OUTPUT_DURATION(120, 305, duration_us);
 
   GUI_USE_PARA(DataID);
@@ -187,7 +188,8 @@ void FIR_PROCESSING_Q15Process(int LP_or_HP)
   static int counter_FIR_Ds;
   static int counter_FIR_Dd;
   int DataID = 1;
-  uint32_t duration_us = 0x00;
+  uint32_t nb_cycles;
+  uint32_t duration_us;
   arm_float_to_q15((float32_t *)&aFIR_F32_1kHz_15kHz[0], (q15_t *)&aFIR_Q15_1kHz_15kHz[0], TEST_LENGTH_SAMPLES);
   /* Call FIR init function to initialize the instance structure. */
   if (LP_or_HP == LPF)
@@ -201,16 +203,16 @@ void FIR_PROCESSING_Q15Process(int LP_or_HP)
   else
   {/* empty else */
   }
-  TimerCount_Start();
+  nb_cycles = cycles_counter();
   for (counter_FIR_Q15_p = 0; counter_FIR_Q15_p < numBlocks; counter_FIR_Q15_p++)
   {   // process with FIR
     arm_fir_q15(&FIR_Q15_Struct, aFIR_Q15_1kHz_15kHz + (counter_FIR_Q15_p * BLOCKSIZE), aFIR_Q15_Output + (counter_FIR_Q15_p * BLOCKSIZE), BLOCKSIZE);
   }
-  TimerCount_Stop(nb_cycles);
+  nb_cycles = cycles_counter() - nb_cycles;
 
   GUI_Clear();
   LCD_OUTPUT_Cycles(5, 305, nb_cycles);
-  duration_us = (uint32_t)(((uint64_t)US_IN_SECOND * (nb_cycles)) / SystemCoreClock);
+  duration_us = (uint32_t)cycles_counter_to_us(nb_cycles);
   LCD_OUTPUT_DURATION(120, 305, duration_us);
 
   GUI_USE_PARA(DataID);
@@ -242,7 +244,8 @@ void FIR_PROCESSING_Q31Process(void)
   static int counter_FIR_Ds;
   static int counter_FIR_Dd;
   int DataID = 1;
-  uint32_t duration_us = 0x00;
+  uint32_t nb_cycles;
+  uint32_t duration_us;
   arm_float_to_q31((float32_t *)&aFIR_F32_Coeffs[0], (q31_t *)&aFIR_Q31_Coeffs[0], NUM_TAPS);
 
   arm_float_to_q31((float32_t *)&aFIR_F32_1kHz_15kHz[0], (q31_t *)&aFIR_Q31_1kHz_15kHz[0], TEST_LENGTH_SAMPLES);
@@ -250,17 +253,17 @@ void FIR_PROCESSING_Q31Process(void)
   arm_fir_init_q31(&FIR_Q31_Struct, NUM_TAPS, (q31_t *)&aFIR_Q31_Coeffs[0], &firStateQ31[0], blockSize);
 
   /* Call the FIR process function for every blockSize samples  */
-  TimerCount_Start();
+  nb_cycles = cycles_counter();
 
   for (counter_FIR_Q31_p = 0; counter_FIR_Q31_p < numBlocks; counter_FIR_Q31_p++)
   {
     arm_fir_q31(&FIR_Q31_Struct, aFIR_Q31_1kHz_15kHz + (counter_FIR_Q31_p * blockSize), aFIR_Q31_Output + (counter_FIR_Q31_p * blockSize), blockSize);
   }
-  TimerCount_Stop(nb_cycles);
+  nb_cycles = cycles_counter() - nb_cycles;
 
   GUI_Clear();
   LCD_OUTPUT_Cycles(5, 305, nb_cycles);
-  duration_us = (uint32_t)(((uint64_t)US_IN_SECOND * (nb_cycles)) / SystemCoreClock);
+  duration_us = (uint32_t)cycles_counter_to_us(nb_cycles);
   LCD_OUTPUT_DURATION(120, 305, duration_us);
 
   GUI_USE_PARA(DataID);

@@ -36,40 +36,21 @@ Purpose     : Demonstrates how a touch screen can be calibrated at run time
 */
 
 #include "calibration.h"
-#include "rtc.h"
 #include "GUI.h"
+#include <stdbool.h>
+#include <stdio.h>
+#include <string.h>
 
 
 typedef union
 {
   struct
   {
-uint32_t     A1 :
-    15;
-uint32_t     B1 :
-    16;
-uint32_t     Reserved :
-    1;
-  }
-  b;
+	  uint32_t     A : 16;
+	  uint32_t     B : 16;
+  } b;
   uint32_t d32;
-}CALIBRATION_Data1Typedef;
-
-typedef union
-{
-  struct
-  {
-uint32_t      A2 :
-    15;
-uint32_t      B2 :
-    16;
-uint32_t      IsCalibrated :
-    1;
-  }
-  b;
-  uint32_t d32;
-
-}CALIBRATION_Data2Typedef;
+}CALIBRATION_DataTypedef;
 
 uint32_t CALIBRATION_Done = 0;
 /********************************************************************
@@ -86,14 +67,22 @@ static const char * _acPos[] =
   };
 
 int16_t  A1, A2, B1, B2;
-CALIBRATION_Data1Typedef data1;
-CALIBRATION_Data2Typedef data2;
+CALIBRATION_DataTypedef data1;
+CALIBRATION_DataTypedef data2;
 /*********************************************************************
 *
 *       Static code
 *
 **********************************************************************
 */
+
+static bool is_calibrated(const CALIBRATION_DataTypedef *data)
+{
+	unsigned char *buf = (void *)data;
+
+	return (*buf ||	memcmp(buf, buf + 1, sizeof(*data) - 1));
+}
+
 /*********************************************************************
 *
 *       _WaitForPressedState
@@ -235,12 +224,12 @@ void CALIBRATION_Check(void)
   data1.d32 = BACKUP_RestoreParameter(RTC_BKP_DR0);
   data2.d32 = BACKUP_RestoreParameter(RTC_BKP_DR1);
 
-  A2 = data2.b.A2;
-  B2 = data2.b.B2;
-  A1 = data1.b.A1;
-  B1 = data1.b.B1;
+  A2 = data2.b.A;
+  B2 = data2.b.B;
+  A1 = data1.b.A;
+  B1 = data1.b.B;
 
-  if (data2.b.IsCalibrated == 0)
+  if (!is_calibrated(&data2))
   {
     GUI_SetBkColor(GUI_WHITE);
     GUI_Clear();
@@ -265,13 +254,12 @@ void CALIBRATION_Check(void)
     A2 = (1000 * ( aLogY[1] - aLogY[0])) / ( aPhysY[1] - aPhysY[0]);
     B2 = (1000 * aLogY[0]) - A2 * aPhysY[0];
 
-    data1.b.A1 = A1;
-    data1.b.B1 = B1;
+    data1.b.A = A1;
+    data1.b.B = B1;
     BACKUP_SaveParameter(RTC_BKP_DR0, data1.d32);
 
-    data2.b.A2 = A2;
-    data2.b.B2 = B2;
-    data2.b.IsCalibrated = 1;
+    data2.b.A = A2;
+    data2.b.B = B2;
     BACKUP_SaveParameter(RTC_BKP_DR1, data2.d32);
 
     /* Display the result */
@@ -281,12 +269,8 @@ void CALIBRATION_Check(void)
                         "calibrated. Please use\n"
                         "the cursor to test\n"
                         "the calibration...");
-
-
   }
-
   CALIBRATION_Done = 1;
-
   GUI_Delay(1000);
 }
 
@@ -297,12 +281,22 @@ uint8_t CALIBRATION_IsDone(void)
 
 uint16_t CALIBRATION_GetX(uint16_t x)
 {
-  return (((A1 * x) + B1) / 1000);
+  int xx = (((A1 * x) + B1) / 1000);
+
+  if (xx < 0)
+	  xx = LCD_GetXSize() + xx;
+
+  return xx;
 }
 
 uint16_t CALIBRATION_GetY(uint16_t y)
 {
-  return (((A2 * y) + B2) / 1000);
+  int yy = (((A2 * y) + B2) / 1000);
+
+  if (yy < 0)
+	  yy = LCD_GetYSize() + yy;
+
+  return yy;
 }
 /************************ (C) COPYRIGHT STMicroelectronics ************************/
 

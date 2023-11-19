@@ -39,6 +39,10 @@
 #include "GRAPH.h"
 #include "DROPDOWN.h"
 /* External variables --------------------------------------------------------*/
+
+#define GRAPH_WIDTH  220
+#define GRAPH_HEIGHT 150
+
 extern GRAPH_DATA_Handle  aGraph_Data[2]; // Array of handles for the GRAPH_DATA objects
 
 #endif /* __DISPLAY_H */

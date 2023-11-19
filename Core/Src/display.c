@@ -35,17 +35,22 @@
 #include "display.h"
 #include "fir.h"
 #include "fft.h"
+#include <stdio.h>
 
 /* Private typedef -----------------------------------------------------------*/
 /* Private define ------------------------------------------------------------*/
 /* Private macro -------------------------------------------------------------*/
 /* Private function prototypes -----------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/
-uint16_t uhADCxConvertedValue  = 0;
-uint32_t nb_cycles        = 0x00;
-DAC_ChannelConfTypeDef   sConfigDspDemo;
-ADC_ChannelConfTypeDef   ConfigAdcDspDemo;
-uint16_t aADC1ConvertedValue_s [SAMPLES];
+
+const uint16_t sine_12bit[SINE_SAMPLES] = {
+    2047, 2447, 2831, 3185, 3498, 3750, 3939, 4056, 4095, 4056,
+    3939, 3750, 3495, 3185, 2831, 2447, 2047, 1647, 1263, 909,
+    599, 344, 155, 38, 0, 38, 155, 344, 599, 909, 1263, 1647,
+    2047, 2447, 2831, 3185, 3498, 3750, 3939, 4056, 4095, 4056,
+    3939, 3750, 3495, 3185, 2831, 2447, 2047, 1647, 1263, 909,
+    599, 344, 155, 38, 0, 38, 155, 344, 599, 909, 1263, 1647
+};
 
 GRAPH_DATA_Handle  aGraph_Data[2]; // Array of handles for the GRAPH_DATA objects
 GUI_COLOR aGraphColor[] = {GUI_RED, GUI_GREEN}; // Array of colors for the GRAPH_DATA objects
@@ -56,7 +61,7 @@ int IsFloat32 	;
 int IsFFT 		;
 int LP_or_HP		;
 
-int FFT_SIZE_CHOOSE =1024;
+int FFT_SIZE_CHOOSE = 64;
 
 /**
   * @brief  This function Draws Lables on graph.
@@ -116,7 +121,7 @@ static const GUI_WIDGET_CREATE_INFO _aDialogCreate[] =
     {
       FRAMEWIN_CreateIndirect, "DSP DEMO",  0                ,   0,   0, 240, 300, FRAMEWIN_CF_ACTIVE
     },
-    { GRAPH_CreateIndirect,     0,                   GUI_ID_GRAPH0    ,   5,   5, 225, 150 },
+    { GRAPH_CreateIndirect, 0, GUI_ID_GRAPH0, 5, 5, GRAPH_WIDTH, GRAPH_HEIGHT },
     { SLIDER_CreateIndirect, "change Freq", GUI_ID_SLIDER0, 5, 155, 225, 30, 0, 0, 0 },
     { RADIO_CreateIndirect, "FFT_FIR", GUI_ID_RADIO2, 5, 190, 60, 50, 0, 6402, 0 },
     { RADIO_CreateIndirect, "F32_Q15_Q31", GUI_ID_RADIO3, 55, 190, 78, 60, 0, 5123, 0 },
@@ -201,9 +206,8 @@ static void GUI_Callback(WM_MESSAGE * pMsg)
 
       hItem = WM_GetDialogItem(hDlg, GUI_ID_GRAPH0);
       /* Add graphs */
-      for (i = 0; i < GUI_COUNTOF(aGraphColor); i++)
-      {
-        aGraph_Data[i] = GRAPH_DATA_YT_Create(aGraphColor[i], 2048, 0, 0);
+      for (i = 0; i < GUI_COUNTOF(aGraphColor); i++) {
+        aGraph_Data[i] = GRAPH_DATA_YT_Create(aGraphColor[i], GRAPH_WIDTH, 0, 0);
         GRAPH_AttachData(hItem, aGraph_Data[i]);
       }
       /*  Set graph attributes */
@@ -216,16 +220,16 @@ static void GUI_Callback(WM_MESSAGE * pMsg)
       /* Init slider widgets */
 
       hItem = WM_GetDialogItem(hDlg, GUI_ID_SLIDER0);
-      SLIDER_SetRange(hItem, 0, 10);
-      SLIDER_SetValue(hItem, 5);
-      SLIDER_SetNumTicks(hItem, 6);
+      SLIDER_SetRange(hItem, -5, 5);
+      SLIDER_SetValue(hItem, 0);
+      SLIDER_SetNumTicks(hItem, 11);
 
       /* Initialization of 'Points' */
       hItem = WM_GetDialogItem(hDlg, GUI_ID_RADIO1 /* Points */);
       RADIO_SetFont(hItem, &GUI_Font10_ASCII);
-      RADIO_SetText(hItem, "1024", 0);
+	  RADIO_SetText(hItem, "64", 0);
       RADIO_SetText(hItem, "256", 1);
-      RADIO_SetText(hItem, "64", 2);
+	  RADIO_SetText(hItem, "1024", 2);
       RADIO_SetValue(hItem, 0);
       RADIO_SetTextColor(hItem, 0x000000FF);
       RADIO_SetFont(hItem, GUI_FONT_13B_ASCII);
@@ -274,30 +278,31 @@ static void GUI_Callback(WM_MESSAGE * pMsg)
 
             case GUI_ID_SLIDER0:
               /* Set horizontal grid spacing */
-              Value = SLIDER_GetValue(pMsg->hWinSrc) * 100;
-              TIM4_Config(Value + 200);
-              DAC_Ch2_SineWaveConfig();
+			  Value = DAC_FREQ + SLIDER_GetValue(pMsg->hWinSrc) * 1000;
+			  DAC_set_freq_and_restart(Value);
               break;
 
             case GUI_ID_RADIO1:  /*  choose FFT points*/
               switch (RADIO_GetValue(pMsg->hWinSrc))
               {
-                case 0:
+                case 2:
                   FFT_SIZE_CHOOSE = 1024;
                   break;
                 case 1:
                   FFT_SIZE_CHOOSE = 256;
                   break;
-                case 2:
+                case 0:
                   FFT_SIZE_CHOOSE = 64;
                   break;
               }
+			  ADC_set_size_and_restart(FFT_SIZE_CHOOSE);
               break;
             case GUI_ID_RADIO2:  /*  choose FFT or FIR*/
               switch (RADIO_GetValue(pMsg->hWinSrc))
               {
                 case 0:
                   IsFFT = FIR_PROCESS;
+
                   WM_HideWindow(WM_GetDialogItem(pMsg->hWin, GUI_ID_SLIDER0/* Change freq */));
                   WM_HideWindow(WM_GetDialogItem(pMsg->hWin, GUI_ID_RADIO1  /* Points */));
                   WM_HideWindow(WM_GetDialogItem(pMsg->hWin, GUI_ID_RADIO4/* HPF/LPF Q15 */));
@@ -368,16 +373,9 @@ void MainTask(void)
 {
 
   WM_HWIN hDlg;
-  WM_HWIN hGraph;
-  /*##-1- Configure the DAC peripheral #######################################*/
-  DacHandleDspDemo.Instance = DAC;
-  /*##-2- Configure the TIM peripheral #######################################*/
-  DAC_Ch2_SineWaveConfig();
-  ADC1_Ch0_DMA_Config();
-  hGraph = 0;
-  WM_SetCreateFlags(WM_CF_MEMDEV);
+  WM_HWIN hGraph = 0;
 
-  GUI_Init();
+  WM_SetCreateFlags(WM_CF_MEMDEV);
 
   /* Check if recommended memory for the sample is available */
   if (GUI_ALLOC_GetNumFreeBytes() < RECOMMENDED_MEMORY)
@@ -396,6 +394,17 @@ void MainTask(void)
 #ifdef WIN32
     GUI_Delay(10);
 #endif
+
+	  GUI_PID_STATE state;
+
+	  GUI_TOUCH_GetState(&state);
+		  char buf[32];
+
+	  snprintf(buf, sizeof(buf), "%06i, %06i", state.x, state.y);
+	  GUI_DispStringAt(buf, 60, 260);
+
+	  HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
+
     if (!_Stop)
     {
       if (!hGraph)

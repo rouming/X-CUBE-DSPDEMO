@@ -57,7 +57,10 @@
 /** @addtogroup LCD
   * @{
   */
- 
+
+void LCD_Backlight_On(void);
+void LCD_Backlight_Off(void);
+
 /** @defgroup LCD_Exported_Types
   * @{
   */

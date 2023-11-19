@@ -41,7 +41,7 @@
 #endif
 
 /* Includes ------------------------------------------------------------------*/
-#include "global.h"
+#include "main.h"
 /* Private functions ---------------------------------------------------------*/
 void CALIBRATION_Check(void);
 uint8_t  CALIBRATION_IsDone(void);

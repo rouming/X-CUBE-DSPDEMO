@@ -52,6 +52,7 @@ Purpose     : Display controller initialization
   */
 
 #include "GUI.h"
+#include "main.h"
 
 /*********************************************************************
 *
@@ -71,6 +72,23 @@ Purpose     : Display controller initialization
 *
 **********************************************************************
 */
+
+/*********************************************************************
+*
+* GUI_X_Init()
+*
+* Note:
+* GUI_X_Init() is called from GUI_Init is a possibility to init
+* some hardware which needs to be up and running before the GUI.
+* If not required, leave this routine blank.
+*/
+
+void GUI_X_Init(void)
+{
+}
+
+void GUI_X_ErrorOut(const char *s) { }
+
 /*********************************************************************
 *
 *       GUI_X_Config
@@ -93,6 +111,16 @@ void GUI_X_Config(void)
   // Set default font
   //
   GUI_SetDefaultFont(GUI_FONT_6X8);
+}
+
+void GUI_X_Delay(int delay)
+{
+	HAL_Delay(delay);
+}
+
+GUI_TIMER_TIME GUI_X_GetTime(void)
+{
+	return HAL_GetTick();
 }
 
 /*************************** End of file ****************************/

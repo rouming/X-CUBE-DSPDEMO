@@ -33,21 +33,24 @@
   */
 
 /* Includes ------------------------------------------------------------------*/
+#include "arm_const_structs.h"
 #include "fft.h"
 #include "display.h"
+#include "interpolation.h"
 
-float32_t aFFT_Input_f32[FFT_Length_Tab*2];
-float32_t aFFT_Output_f32 [FFT_Length_Tab];
+float32_t fft_interpolated_out_f32[GRAPH_WIDTH];
 
-float32_t FFT_Input_Q15_f[FFT_Length_Tab*2];
-q15_t aFFT_Input_Q15[FFT_Length_Tab*2];
+float32_t FFT_Input_f32[FFT_Length_Tab*2];
+float32_t FFT_Output_f32[FFT_Length_Tab];
+
+q15_t FFT_Input_Q15[FFT_Length_Tab*2];
 q15_t FFT_Output_Q15[FFT_Length_Tab];
 
-float32_t FFT_Input_Q31_f[FFT_Length_Tab*2];
-q31_t aFFT_Input_Q31[FFT_Length_Tab*2];
+q31_t FFT_Input_Q31[FFT_Length_Tab*2];
 q31_t FFT_Output_Q31[FFT_Length_Tab];
 
-
+size_t adc_samples = 64;
+uint16_t adc_buf[ADC_BUF_SZ];
 
 /**
   * @brief  This function Calculate FFT in Q15.
@@ -56,64 +59,83 @@ q31_t FFT_Output_Q31[FFT_Length_Tab];
   */
 void FFT_PROCESSING_Q15Process(uint32_t FFT_Length)
 {
+	const arm_cfft_instance_q15 *cfft_q15 = NULL;
+	const float32_t *fft_out_f32;
 
-  arm_cfft_radix4_instance_q15  FFT_Q15_struct;
+	q15_t maxValue;    /* Max FFT value is stored here */
+	uint32_t maxIndex;    /* Index in Output array where max value is */
 
-  q15_t maxValue;    /* Max FFT value is stored here */
-  uint32_t maxIndex;    /* Index in Output array where max value is */
+	size_t i, fft_len_div2, nb_cycles, duration_us;
 
-  uint32_t index_fill_input_buffer, index_fill_output_buffer, index_fill_adc_buffer = 0;
-  uint32_t duration_us = 0x00;
+	for (i = 0; i < FFT_Length; i++) {
+		float32_t sample;
 
-  for (index_fill_adc_buffer = 0; index_fill_adc_buffer < FFT_Length*2; index_fill_adc_buffer ++)
-  {
-    aADC1ConvertedValue_s[index_fill_adc_buffer] = uhADCxConvertedValue;
-    TIM2_Config();
-  }
-  for (index_fill_input_buffer = 0; index_fill_input_buffer < FFT_Length*2; index_fill_input_buffer += 2)
-  {
-    FFT_Input_Q15_f[(uint16_t)index_fill_input_buffer] = (float32_t)uhADCxConvertedValue / (float32_t)4096.0;
-    /* Imaginary part */
-    FFT_Input_Q15_f[(uint16_t)(index_fill_input_buffer + 1)] = 0;
+		sample = adc_buf[i];
+		/* Convert to [0, 1] range */
+		sample /= 4096;
+		/* Remove DC */
+		sample -= 0.5;
 
-    TIM2_Config();
-  }
+		/* Real part */
+		FFT_Input_f32[i * 2] = sample;
+		/* Imaginary part */
+		FFT_Input_f32[i * 2 + 1] = 0;
+	}
 
-  arm_float_to_q15((float32_t *)&FFT_Input_Q15_f[0], (q15_t *)&aFFT_Input_Q15[0], FFT_Length*2);
+	switch (FFT_Length) {
+	case 64:
+		cfft_q15 = &arm_cfft_sR_q15_len64;
+		break;
+	case 256:
+		cfft_q15 = &arm_cfft_sR_q15_len256;
+		break;
+	case 1024:
+		cfft_q15 = &arm_cfft_sR_q15_len1024;
+		break;
+	}
 
-  /* Initialize the CFFT/CIFFT module, intFlag = 0, doBitReverse = 1 */
-  arm_cfft_radix4_init_q15(&FFT_Q15_struct, FFT_Length, FFT_INVERSE_FLAG, FFT_Normal_OUTPUT_FLAG);
+	arm_float_to_q15(FFT_Input_f32, FFT_Input_Q15, FFT_Length*2);
 
-  TimerCount_Start();
-  arm_cfft_radix4_q15(&FFT_Q15_struct, aFFT_Input_Q15);
-  TimerCount_Stop(nb_cycles);
+	nb_cycles = cycles_counter();
+	/* Run FFT */
+	arm_cfft_q15(cfft_q15, FFT_Input_Q15, FFT_INVERSE_FLAG, FFT_DC_POS_NEG_ORDER_FLAG);
+	nb_cycles = cycles_counter() - nb_cycles;
 
-  GUI_Clear();
-  LCD_OUTPUT_Cycles(5, 305, nb_cycles);
-  duration_us = (uint32_t)(((uint64_t)US_IN_SECOND * (nb_cycles)) / SystemCoreClock);
-  LCD_OUTPUT_DURATION(120, 305, duration_us);
+	GUI_Clear();
+	LCD_OUTPUT_Cycles(5, 305, nb_cycles);
+	duration_us = (uint32_t)cycles_counter_to_us(nb_cycles);
+	LCD_OUTPUT_DURATION(120, 305, duration_us);
 
-  /* Process the data through the Complex Magniture Module for calculating the magnitude at each bin */
-  arm_cmplx_mag_q15(aFFT_Input_Q15, FFT_Output_Q15, FFT_Length);
+	/* We are interested only in DC and positive frequencies */
+	fft_len_div2 = FFT_Length/2;
 
-  /* Calculates maxValue and returns corresponding value */
-  arm_max_q15(FFT_Output_Q15, FFT_Length, &maxValue, &maxIndex);
-  maxValue = 0;
+	/* Calculate magnitude */
+	arm_cmplx_mag_q15(FFT_Input_Q15, FFT_Output_Q15, fft_len_div2);
 
-  for (index_fill_input_buffer = 0; index_fill_input_buffer < FFT_Length*2; index_fill_input_buffer++)
-  {
-    GRAPH_DATA_YT_SetAlign(aGraph_Data[1], GRAPH_ALIGN_LEFT);
-    GRAPH_DATA_YT_MirrorX (aGraph_Data[1], 1);
-    GRAPH_DATA_YT_AddValue(aGraph_Data[1], aADC1ConvertedValue_s[index_fill_input_buffer] / 100 + 50);
-  }
-  for (index_fill_output_buffer = 0; index_fill_output_buffer < FFT_Length; index_fill_output_buffer++)
-  {
-    GRAPH_DATA_YT_SetAlign(aGraph_Data[0], GRAPH_ALIGN_LEFT);
-    GRAPH_DATA_YT_MirrorX (aGraph_Data[0], 1);
-    GRAPH_DATA_YT_AddValue(aGraph_Data[0], FFT_Output_Q15[index_fill_output_buffer] / 50 + 10);
+	/* Calculates maxValue and returns corresponding value */
+	arm_max_q15(FFT_Output_Q15, fft_len_div2, &maxValue, &maxIndex);
+	maxValue = 0;
 
-  }
+	/* Convert to float for further processing */
+	arm_q15_to_float(FFT_Output_Q15, FFT_Output_f32, fft_len_div2);
 
+	for (i = 0; i < adc_samples; i++) {
+		GRAPH_DATA_YT_AddValue(aGraph_Data[1], adc_buf[i] / 50 + 50);
+	}
+
+	if (fft_len_div2 < GRAPH_WIDTH) {
+		BUILD_BUG_ON(GRAPH_WIDTH != ARRAY_SIZE(fft_interpolated_out_f32));
+		interpolate(FFT_Output_f32, fft_len_div2,
+					fft_interpolated_out_f32, GRAPH_WIDTH,
+					lin_interpolation);
+		fft_out_f32 = fft_interpolated_out_f32;
+	} else {
+		fft_out_f32 = FFT_Output_f32;
+	}
+
+	for (i = 0; i < GRAPH_WIDTH; i++) {
+		GRAPH_DATA_YT_AddValue(aGraph_Data[0], fft_out_f32[i] * 600 + 10);
+	}
 }
 
 /**
@@ -123,57 +145,78 @@ void FFT_PROCESSING_Q15Process(uint32_t FFT_Length)
   */
 void FFT_PROCESSING_F32Process(uint32_t FFT_Length)
 {
-  arm_cfft_radix4_instance_f32  FFT_F32_struct;
+	const arm_cfft_instance_f32 *cfft_f32 = NULL;
+	const float32_t *fft_out_f32;
 
-  float32_t maxValue;    /* Max FFT value is stored here */
-  uint32_t maxIndex;    /* Index in Output array where max value is */
+	float32_t maxValue;    /* Max FFT value is stored here */
+	uint32_t maxIndex;    /* Index in Output array where max value is */
 
-  unsigned index_fill_input_buffer, index_fill_output_buffer, index_fill_adc_buffer = 0;
-  uint32_t duration_us = 0x00;
+	size_t i, fft_len_div2, nb_cycles, duration_us;
 
-  for (index_fill_adc_buffer = 0; index_fill_adc_buffer < FFT_Length*2; index_fill_adc_buffer ++)
-  {
-    aADC1ConvertedValue_s[index_fill_adc_buffer] = uhADCxConvertedValue;
-    TIM2_Config();
-  }
-  for (index_fill_input_buffer = 0; index_fill_input_buffer < FFT_Length*2; index_fill_input_buffer += 2)
-  {
-    aFFT_Input_f32[(uint16_t)index_fill_input_buffer] = (float32_t)uhADCxConvertedValue / (float32_t)4096.0;
-    /* Imaginary part */
-    aFFT_Input_f32[(uint16_t)(index_fill_input_buffer + 1)] = 0;
-    TIM2_Config();
-  }
-  /* Initialize the CFFT/CIFFT module, intFlag = 0, doBitReverse = 1 */
-  arm_cfft_radix4_init_f32(&FFT_F32_struct, FFT_Length, FFT_INVERSE_FLAG, FFT_Normal_OUTPUT_FLAG);
+	for (i = 0; i < FFT_Length; i++) {
+		float32_t sample;
 
-  TimerCount_Start();
-  arm_cfft_radix4_f32(&FFT_F32_struct, aFFT_Input_f32);
-  TimerCount_Stop(nb_cycles);
+		sample = adc_buf[i];
+		/* Convert to [0, 1] range */
+		sample /= 4096;
+		/* Remove DC */
+		sample -= 0.5;
 
-  GUI_Clear();
-  LCD_OUTPUT_Cycles(5, 305, nb_cycles);
-  duration_us = (uint32_t)(((uint64_t)US_IN_SECOND * (nb_cycles)) / SystemCoreClock);
-  LCD_OUTPUT_DURATION(120, 305, duration_us);
+		/* Real part */
+		FFT_Input_f32[i * 2] = sample;
+		/* Imaginary part */
+		FFT_Input_f32[i * 2 + 1] = 0;
+	}
 
-  /* Process the data through the Complex Magniture Module for calculating the magnitude at each bin */
-  arm_cmplx_mag_f32(aFFT_Input_f32, aFFT_Output_f32, FFT_Length);
+	switch (FFT_Length) {
+	case 64:
+		cfft_f32 = &arm_cfft_sR_f32_len64;
+		break;
+	case 256:
+		cfft_f32 = &arm_cfft_sR_f32_len256;
+		break;
+	case 1024:
+		cfft_f32 = &arm_cfft_sR_f32_len1024;
+		break;
+	}
 
-  /* Calculates maxValue and returns corresponding value */
-  arm_max_f32(aFFT_Output_f32, FFT_Length, &maxValue, &maxIndex);
-  maxValue = 0;
+	nb_cycles = cycles_counter();
+	/* Run FFT */
+	arm_cfft_f32(cfft_f32, FFT_Input_f32, FFT_INVERSE_FLAG, FFT_DC_POS_NEG_ORDER_FLAG);
+	nb_cycles = cycles_counter() - nb_cycles;
 
-  for (index_fill_input_buffer = 0; index_fill_input_buffer < FFT_Length*2; index_fill_input_buffer++)
-  {
-    GRAPH_DATA_YT_SetAlign(aGraph_Data[1], GRAPH_ALIGN_LEFT);
-    GRAPH_DATA_YT_MirrorX (aGraph_Data[1], 1);
-    GRAPH_DATA_YT_AddValue(aGraph_Data[1], aADC1ConvertedValue_s[index_fill_input_buffer] / 50 + 50);
-  }
-  for (index_fill_output_buffer = 0; index_fill_output_buffer < FFT_Length; index_fill_output_buffer++)
-  {
-    GRAPH_DATA_YT_SetAlign(aGraph_Data[0], GRAPH_ALIGN_LEFT);
-    GRAPH_DATA_YT_MirrorX (aGraph_Data[0], 1);
-    GRAPH_DATA_YT_AddValue(aGraph_Data[0], aFFT_Output_f32[index_fill_output_buffer] + 10);
-  }
+	GUI_Clear();
+	LCD_OUTPUT_Cycles(5, 305, nb_cycles);
+	duration_us = (uint32_t)cycles_counter_to_us(nb_cycles);
+	LCD_OUTPUT_DURATION(120, 305, duration_us);
+
+	/* We are interested only in DC and positive frequencies */
+	fft_len_div2 = FFT_Length/2;
+
+	/* Calculate magnitude */
+	arm_cmplx_mag_f32(FFT_Input_f32, FFT_Output_f32, fft_len_div2);
+
+	/* Calculates maxValue and returns corresponding value */
+	arm_max_f32(FFT_Output_f32, fft_len_div2, &maxValue, &maxIndex);
+	maxValue = 0;
+
+	for (i = 0; i < adc_samples; i++) {
+		GRAPH_DATA_YT_AddValue(aGraph_Data[1], adc_buf[i] / 50 + 50);
+	}
+
+	if (fft_len_div2 < GRAPH_WIDTH) {
+		BUILD_BUG_ON(GRAPH_WIDTH != ARRAY_SIZE(fft_interpolated_out_f32));
+		interpolate(FFT_Output_f32, fft_len_div2,
+					fft_interpolated_out_f32, GRAPH_WIDTH,
+					lin_interpolation);
+		fft_out_f32 = fft_interpolated_out_f32;
+	} else {
+		fft_out_f32 = FFT_Output_f32;
+	}
+
+	for (i = 0; i < GRAPH_WIDTH; i++) {
+		GRAPH_DATA_YT_AddValue(aGraph_Data[0], fft_out_f32[i] * 5 + 10);
+	}
 }
 
 /**
@@ -183,62 +226,83 @@ void FFT_PROCESSING_F32Process(uint32_t FFT_Length)
   */
 void FFT_PROCESSING_Q31Process(uint32_t FFT_Length)
 {
-  arm_cfft_radix4_instance_q31  FFT_Q31_struct;
+	const arm_cfft_instance_q31 *cfft_q31 = NULL;
+	const float32_t *fft_out_f32;
 
-  q31_t maxValue;    /* Max FFT value is stored here */
-  uint32_t maxIndex;    /* Index in Output array where max value is */
+	q31_t maxValue;    /* Max FFT value is stored here */
+	uint32_t maxIndex;    /* Index in Output array where max value is */
 
-  uint32_t index_fill_input_buffer, index_fill_output_buffer, index_fill_adc_buffer = 0;
-  uint32_t duration_us = 0x00;
+	size_t i, fft_len_div2, nb_cycles, duration_us;
 
-  for (index_fill_adc_buffer = 0; index_fill_adc_buffer < FFT_Length*2; index_fill_adc_buffer ++)
-  {
-    aADC1ConvertedValue_s[index_fill_adc_buffer] = uhADCxConvertedValue;
-    TIM2_Config();
-  }
-  for (index_fill_input_buffer = 0; index_fill_input_buffer < FFT_Length*2; index_fill_input_buffer += 2)
-  {
-    FFT_Input_Q31_f[(uint16_t)index_fill_input_buffer] = (float32_t)uhADCxConvertedValue / (float32_t)4096.0;
-    /* Imaginary part */
-    FFT_Input_Q31_f[(uint16_t)(index_fill_input_buffer + 1)] = 0;
+	for (i = 0; i < FFT_Length; i++) {
+		float32_t sample;
 
-    TIM2_Config();
-  }
+		sample = adc_buf[i];
+		/* Convert to [0, 1] range */
+		sample /= 4096;
+		/* Remove DC */
+		sample -= 0.5;
 
-  arm_float_to_q31((float32_t *)&FFT_Input_Q31_f[0], (q31_t *)&aFFT_Input_Q31[0], FFT_Length*2);
+		/* Real part */
+		FFT_Input_f32[i * 2] = sample;
+		/* Imaginary part */
+		FFT_Input_f32[i * 2 + 1] = 0;
+	}
 
-  /* Initialize the CFFT/CIFFT module, intFlag = 0, doBitReverse = 1 */
-  arm_cfft_radix4_init_q31(&FFT_Q31_struct, FFT_Length, FFT_INVERSE_FLAG, FFT_Normal_OUTPUT_FLAG);
+	switch (FFT_Length) {
+	case 64:
+		cfft_q31 = &arm_cfft_sR_q31_len64;
+		break;
+	case 256:
+		cfft_q31 = &arm_cfft_sR_q31_len256;
+		break;
+	case 1024:
+		cfft_q31 = &arm_cfft_sR_q31_len1024;
+		break;
+	}
 
-  TimerCount_Start();
-  arm_cfft_radix4_q31(&FFT_Q31_struct, aFFT_Input_Q31);
-  TimerCount_Stop(nb_cycles);
+	arm_float_to_q31(FFT_Input_f32, FFT_Input_Q31, FFT_Length*2);
 
-  GUI_Clear();
-  LCD_OUTPUT_Cycles(5, 305, nb_cycles);
-  duration_us = (uint32_t)(((uint64_t)US_IN_SECOND * (nb_cycles)) / SystemCoreClock);
-  LCD_OUTPUT_DURATION(120, 305, duration_us);
+	nb_cycles = cycles_counter();
+	/* Run FFT */
+	arm_cfft_q31(cfft_q31, FFT_Input_Q31, FFT_INVERSE_FLAG, FFT_DC_POS_NEG_ORDER_FLAG);
+	nb_cycles = cycles_counter() - nb_cycles;
 
-  /* Process the data through the Complex Magniture Module for calculating the magnitude at each bin */
-  arm_cmplx_mag_q31(aFFT_Input_Q31, FFT_Output_Q31, FFT_Length);
+	GUI_Clear();
+	LCD_OUTPUT_Cycles(5, 305, nb_cycles);
+	duration_us = (uint32_t)cycles_counter_to_us(nb_cycles);
+	LCD_OUTPUT_DURATION(120, 305, duration_us);
 
-  /* Calculates maxValue and returns corresponding value */
-  arm_max_q31(FFT_Output_Q31, FFT_Length, &maxValue, &maxIndex);
-  maxValue = 0;
+	/* We are interested only in DC and positive frequencies */
+	fft_len_div2 = FFT_Length/2;
 
-  for (index_fill_input_buffer = 0; index_fill_input_buffer < FFT_Length*2; index_fill_input_buffer++)
-  {
-    GRAPH_DATA_YT_SetAlign(aGraph_Data[1], GRAPH_ALIGN_LEFT);
-    GRAPH_DATA_YT_MirrorX (aGraph_Data[1], 1);
-    GRAPH_DATA_YT_AddValue(aGraph_Data[1], aADC1ConvertedValue_s[index_fill_input_buffer] / 50 + 50);
-  }
-  for (index_fill_output_buffer = 0; index_fill_output_buffer < FFT_Length; index_fill_output_buffer++)
-  {
-    GRAPH_DATA_YT_SetAlign(aGraph_Data[0], GRAPH_ALIGN_LEFT);
-    GRAPH_DATA_YT_MirrorX (aGraph_Data[0], 1);
-    GRAPH_DATA_YT_AddValue(aGraph_Data[0], FFT_Output_Q31[index_fill_output_buffer] / 5376212 + 10);
+	/* Calculate magnitude */
+	arm_cmplx_mag_q31(FFT_Input_Q31, FFT_Output_Q31, fft_len_div2);
 
-  }
+	/* Calculates maxValue and returns corresponding value */
+	arm_max_q31(FFT_Output_Q31, fft_len_div2, &maxValue, &maxIndex);
+	maxValue = 0;
+
+	/* Convert to float for further processing */
+	arm_q31_to_float(FFT_Output_Q31, FFT_Output_f32, fft_len_div2);
+
+	for (i = 0; i < adc_samples; i++) {
+		GRAPH_DATA_YT_AddValue(aGraph_Data[1], adc_buf[i] / 50 + 50);
+	}
+
+	if (fft_len_div2 < GRAPH_WIDTH) {
+		BUILD_BUG_ON(GRAPH_WIDTH != ARRAY_SIZE(fft_interpolated_out_f32));
+		interpolate(FFT_Output_f32, fft_len_div2,
+					fft_interpolated_out_f32, GRAPH_WIDTH,
+					lin_interpolation);
+		fft_out_f32 = fft_interpolated_out_f32;
+	} else {
+		fft_out_f32 = FFT_Output_f32;
+	}
+
+	for (i = 0; i < GRAPH_WIDTH; i++) {
+		GRAPH_DATA_YT_AddValue(aGraph_Data[0], fft_out_f32[i] * 600 + 10);
+	}
 }
 
 /************************ (C) COPYRIGHT STMicroelectronics ************************/
