@@ -28,6 +28,9 @@
 
 #include "arm_math.h"
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wstrict-aliasing"
+
 /**
  * @ingroup groupFilters
  */
@@ -108,8 +111,11 @@ void arm_fir_q15(
   {
     /* Copy four new input samples into the state buffer.
      ** Use 32-bit SIMD to move the 16-bit data.  Only requires two copies. */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wstrict-aliasing"
     *__SIMD32(pStateCurnt)++ = *__SIMD32(pSrc)++;
     *__SIMD32(pStateCurnt)++ = *__SIMD32(pSrc)++;
+#pragma GCC diagnostic pop
 
     /* Set all accumulators to zero */
     acc0 = 0;
@@ -677,3 +683,5 @@ void arm_fir_q15(
 /**
  * @} end of FIR group
  */
+
+#pragma GCC diagnostic pop

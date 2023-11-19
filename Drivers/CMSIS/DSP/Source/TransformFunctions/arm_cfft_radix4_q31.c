@@ -29,6 +29,9 @@
 
 #include "arm_math.h"
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wstrict-aliasing"
+
 void arm_radix4_butterfly_inverse_q31(
 q31_t * pSrc,
 uint32_t fftLen,
@@ -1387,3 +1390,5 @@ void arm_radix4_butterfly_inverse_q31(
 
   /* End of last stage process */
 }
+
+#pragma GCC diagnostic pop

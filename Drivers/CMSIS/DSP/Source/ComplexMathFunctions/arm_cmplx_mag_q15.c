@@ -28,6 +28,9 @@
 
 #include "arm_math.h"
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wstrict-aliasing"
+
 /**
  * @ingroup groupCmplxMath
  */
@@ -139,3 +142,5 @@ void arm_cmplx_mag_q15(
 /**
  * @} end of cmplx_mag group
  */
+
+#pragma GCC diagnostic pop

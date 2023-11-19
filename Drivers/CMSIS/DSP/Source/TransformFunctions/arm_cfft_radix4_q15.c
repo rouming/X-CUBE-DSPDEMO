@@ -29,6 +29,8 @@
 
 #include "arm_math.h"
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wstrict-aliasing"
 
 void arm_radix4_butterfly_q15(
   q15_t * pSrc16,
@@ -1908,3 +1910,5 @@ void arm_radix4_butterfly_inverse_q15(
 #endif /* #if defined (ARM_MATH_DSP) */
 
 }
+
+#pragma GCC diagnostic pop
